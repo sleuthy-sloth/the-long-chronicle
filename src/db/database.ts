@@ -1,21 +1,29 @@
 // Canonical Dexie database for The Long Chronicle (Stream A).
 //
-// Database name 'long-chronicle', schema version 1. Table names and indexes
+// Database name 'long-chronicle', schema version 2. Table names and indexes
 // below are the contract Stream B's shim (src/lib/localDb.ts) was built
 // against — do NOT rename a table or drop an index without a version bump,
 // or data written by earlier builds becomes unreadable.
 //
 // ## Migration strategy
-// - Every schema change gets a new version: `this.version(2).stores({...})`
+// - Every schema change gets a new version: `this.version(3).stores({...})`
 //   with the FULL store list (Dexie requires the complete schema per version).
 // - Data migrations go in `.upgrade(tx)` on that version, reading the old
-//   shape and writing the new one. Never mutate v1's stores() in place.
+//   shape and writing the new one. Never mutate v1's or v2's stores() in place.
 // - Zod schemas in src/db/validation.ts are the source of truth for what a
 //   valid row looks like; bump the schema version in src/config/app.ts when
 //   the shape changes.
 // - No seed data is ever written. A fresh install starts empty; the user
 //   creates their first chronicle. (Copyright boundary: no rulebook content,
 //   prompt tables, or example text is bundled anywhere in this app.)
+//
+// ## v1 → v2 (seven-features round)
+// - New tables: `characterSnapshots`, `attachments`.
+// - `memories.lastReviewedAt` (ISO timestamp | null; v1 rows get null) and
+//   `promptNotes.used` (boolean; v1 rows get false) / `usedAt` — set by the
+//   v2 `.upgrade()` below. Adding a non-indexed field needs no store change,
+//   so the upgrade only backfills defaults; all v1 records are preserved.
+// - `timelineEvents.type` gains the 'timeJump' value (no store change).
 //
 // ## Validation
 // All write helpers in this file validate through Zod before touching Dexie
@@ -31,9 +39,13 @@ import {
   skillSchema,
 } from './validation'
 import type { ChronicleData, TableName as ExportTableName } from '../lib/export'
+import type { AttachmentExport } from '../lib/export'
+import { attachmentFromExport, attachmentToExport } from '../lib/attachments'
 import { remapChronicleAsNew } from '../lib/remap'
 import type {
   AppSettings,
+  Attachment,
+  CharacterSnapshot,
   CharacterStateChange,
   Chronicle,
   ChronicleStatus,
@@ -57,7 +69,7 @@ import type {
 import { newId, nowIso } from './types'
 
 export const DB_NAME = 'long-chronicle'
-export const DB_VERSION = 1
+export const DB_VERSION = 2
 /** The single settings row id. */
 export const SETTINGS_ID = 'settings'
 
@@ -88,6 +100,8 @@ export class ChronicleDB extends Dexie {
   promptNotes!: Table<PromptNote, string>
   quickNotes!: Table<QuickNote, string>
   endings!: Table<Ending, string>
+  characterSnapshots!: Table<CharacterSnapshot, string>
+  attachments!: Table<Attachment, string>
   settings!: Table<AppSettings, string>
 
   constructor() {
@@ -113,6 +127,47 @@ export class ChronicleDB extends Dexie {
       endings: 'id, chronicleId, createdAt',
       settings: 'id',
     })
+    // v2: new tables characterSnapshots + attachments; backfill the new
+    // optional fields on v1 rows (lastReviewedAt → null, promptNotes.used →
+    // false). The upgrade never deletes or rewrites any other data.
+    this.version(2)
+      .stores({
+        chronicles: 'id, chronicleId, status, updatedAt',
+        skills: 'id, chronicleId, name, updatedAt',
+        resources: 'id, chronicleId, name, updatedAt',
+        characterStateChanges: 'id, chronicleId, journalEntryId, kind, recordId, createdAt',
+        memories: 'id, chronicleId, code, status, updatedAt',
+        memoryVersions: 'id, chronicleId, memoryId, version, createdAt',
+        journalEntries: 'id, chronicleId, number, pinned, draft, updatedAt',
+        journalEntryDrafts: 'id, chronicleId, entryId, updatedAt',
+        timelineEvents: 'id, chronicleId, type, sourceId, createdAt',
+        people: 'id, chronicleId, name, updatedAt',
+        relationships: 'id, chronicleId, personId, createdAt',
+        places: 'id, chronicleId, name, updatedAt',
+        storyThreads: 'id, chronicleId, status, updatedAt',
+        recaps: 'id, chronicleId, createdAt',
+        diceRolls: 'id, chronicleId, createdAt',
+        promptNotes: 'id, chronicleId, journalEntryId, createdAt',
+        quickNotes: 'id, chronicleId, createdAt',
+        endings: 'id, chronicleId, createdAt',
+        characterSnapshots: 'id, chronicleId, createdAt',
+        attachments: 'id, chronicleId, recordType, recordId, createdAt',
+        settings: 'id',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('memories')
+          .toCollection()
+          .modify((m: Record<string, unknown>) => {
+            if (m.lastReviewedAt === undefined) m.lastReviewedAt = null
+          })
+        await tx
+          .table('promptNotes')
+          .toCollection()
+          .modify((p: Record<string, unknown>) => {
+            if (p.used === undefined) p.used = false
+          })
+      })
   }
 }
 
@@ -275,9 +330,17 @@ export async function duplicateChronicle(id: string): Promise<Chronicle> {
     diceRolls: await byChronicle(db.diceRolls),
     promptNotes: await byChronicle(db.promptNotes),
     quickNotes: await byChronicle(db.quickNotes),
+    // Backup shape (bytes as base64) — remap works on JSON-safe rows, and the
+    // copy is decoded back to Blobs before writing, below.
+    attachments: await Promise.all((await byChronicle(db.attachments)).map(attachmentToExport)),
     ending: (await byChronicle(db.endings))[0] ?? null,
   }
   const { chronicle, rows } = remapChronicleAsNew(data)
+  if (rows.attachments && rows.attachments.length > 0) {
+    rows.attachments = await Promise.all(
+      rows.attachments.map((row) => attachmentFromExport(row as AttachmentExport)),
+    )
+  }
   const now = nowIso()
   const copy = chronicleSchema.parse({
     ...chronicle,
@@ -326,6 +389,8 @@ const CHRONICLE_CHILD_TABLES = [
   'promptNotes',
   'quickNotes',
   'endings',
+  'characterSnapshots',
+  'attachments',
 ] as const
 
 /**

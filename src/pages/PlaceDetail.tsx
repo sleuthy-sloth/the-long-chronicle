@@ -9,6 +9,7 @@ import { Badge, Button, ConfirmDialog, EmptyState, Field, Input, Modal, Textarea
 import { useLiveList } from '../lib/live'
 import { deletePlace, linkedRecordsForPlace, updatePlace } from '../lib/people'
 import type { JournalEntry, Memory, Person } from '../db/types'
+import AttachmentList from '../components/AttachmentList'
 
 export default function PlaceDetail() {
   const { placeId } = useParams<{ placeId: string }>()
@@ -210,6 +211,8 @@ export default function PlaceDetail() {
           </div>
         </form>
       </Modal>
+
+      <AttachmentList chronicleId={place.chronicleId} recordType="place" recordId={place.id} />
 
       <ConfirmDialog
         open={confirmDelete}

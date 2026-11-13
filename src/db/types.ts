@@ -22,6 +22,8 @@ export interface Memory extends Base {
   code: string; title: string; text: string; status: MemoryStatus
   tags: string[]; occurredEra?: string; recordedEra?: string
   personIds: string[]; placeIds: string[]; journalEntryIds: string[]; notes?: string
+  /** ISO timestamp of the last review in Memory Review Mode; null = never reviewed (v2). */
+  lastReviewedAt?: string | null
 }
 export interface MemoryVersion extends Base {
   memoryId: string; version: number; text: string; status: MemoryStatus
@@ -37,7 +39,7 @@ export interface JournalEntry extends Base {
 export interface JournalEntryDraft extends Base { entryId?: string | null; title: string; body: string; era: string; promptText?: string; promptRef?: string }
 export interface TimelineEvent extends Base {
   title: string; description?: string; era: string; sortYear?: number | null
-  type: 'journal' | 'memory' | 'historical' | 'relationship' | 'location' | 'skill' | 'resource' | 'custom'
+  type: 'journal' | 'memory' | 'historical' | 'relationship' | 'location' | 'skill' | 'resource' | 'custom' | 'timeJump'
   sourceId?: string | null; personIds: string[]; placeIds: string[]
 }
 export interface Person extends Base {
@@ -56,8 +58,22 @@ export interface StoryThread extends Base {
 }
 export interface Recap extends Base { title: string; era: string; body: string }
 export interface DiceRoll extends Base { dice: string; results: number[]; total: number; note?: string }
-export interface PromptNote extends Base { text: string; ref?: string; source?: string; era?: string; journalEntryId?: string | null }
+export interface PromptNote extends Base { text: string; ref?: string; source?: string; era?: string; journalEntryId?: string | null; /** Explicitly marked as used in play (v2). */ used?: boolean; usedAt?: string | null }
 export interface QuickNote extends Base { text: string; convertedTo?: string | null }
+/** One frozen item inside a character snapshot: a skill or resource as it stood at capture time. */
+export interface SnapshotItem { name: string; value?: string; description?: string }
+/** Immutable frozen copy of the character sheet at one era (v2). Snapshots are never edited. */
+export interface CharacterSnapshot extends Base {
+  era: string; age?: number; location?: string
+  skills: SnapshotItem[]; resources: SnapshotItem[]; conditions: string[]
+  /** Journal entry or time-jump timeline event this snapshot was taken from, if any. */
+  sourceId?: string | null; sourceKind?: 'journalEntry' | 'timeJump' | 'manual'
+}
+/** A file attached to a memory, journal entry, person, or place (v2). The file bytes live in IndexedDB as a Blob. */
+export interface Attachment extends Base {
+  recordType: 'memory' | 'journalEntry' | 'person' | 'place'
+  recordId: string; fileName: string; mimeType: string; sizeBytes: number; data: Blob
+}
 export interface Ending extends Base { finalEra: string; finalAge?: number; finalLocation?: string; endingType?: string; whatLost?: string; whatEndured?: string; finalScene?: string; epilogue?: string }
 export interface AppSettings { id: string; theme: 'light' | 'dark' | 'system'; activeChronicleId?: string | null; lastExportAt?: string | null; editorFontSize?: number }
 export const newId = () => (typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : `id-${Date.now()}-${Math.random().toString(36).slice(2)}`)

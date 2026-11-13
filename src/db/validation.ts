@@ -11,6 +11,8 @@
 import { z } from 'zod'
 import type {
   AppSettings,
+  Attachment,
+  CharacterSnapshot,
   CharacterStateChange,
   Chronicle,
   DiceRoll,
@@ -56,6 +58,7 @@ export const timelineEventTypeSchema = z.enum([
   'skill',
   'resource',
   'custom',
+  'timeJump',
 ])
 export const themeSchema = z.enum(['light', 'dark', 'system'])
 
@@ -114,6 +117,7 @@ export const memorySchema = baseSchema.extend({
   placeIds: z.array(z.string()),
   journalEntryIds: z.array(z.string()),
   notes: optText,
+  lastReviewedAt: z.string().datetime({ offset: true }).nullable().optional(),
 }) satisfies z.ZodType<Memory>
 
 export const memoryVersionSchema = baseSchema.extend({
@@ -230,7 +234,35 @@ export const promptNoteSchema = baseSchema.extend({
   source: optText,
   era: optText,
   journalEntryId: optTextNull,
+  used: z.boolean().optional(),
+  usedAt: z.string().datetime({ offset: true }).nullable().optional(),
 }) satisfies z.ZodType<PromptNote>
+
+const snapshotItemSchema = z.object({
+  name: z.string().min(1),
+  value: optText,
+  description: optText,
+})
+
+export const characterSnapshotSchema = baseSchema.extend({
+  era: z.string().min(1, 'snapshot era is required').max(200),
+  age: ageSchema.optional(),
+  location: optText,
+  skills: z.array(snapshotItemSchema),
+  resources: z.array(snapshotItemSchema),
+  conditions: z.array(z.string()),
+  sourceId: optTextNull,
+  sourceKind: z.enum(['journalEntry', 'timeJump', 'manual']).optional(),
+}) satisfies z.ZodType<CharacterSnapshot>
+
+export const attachmentSchema = baseSchema.extend({
+  recordType: z.enum(['memory', 'journalEntry', 'person', 'place']),
+  recordId: id,
+  fileName: z.string().min(1, 'file name is required').max(255),
+  mimeType: z.string().min(1, 'mime type is required').max(200),
+  sizeBytes: z.number().int().min(0),
+  data: z.instanceof(Blob),
+}) satisfies z.ZodType<Attachment>
 
 export const quickNoteSchema = baseSchema.extend({
   text: z.string().min(1, 'note text is required'),
@@ -276,6 +308,8 @@ export const entitySchemas = {
   promptNotes: promptNoteSchema,
   quickNotes: quickNoteSchema,
   endings: endingSchema,
+  characterSnapshots: characterSnapshotSchema,
+  attachments: attachmentSchema,
   settings: appSettingsSchema,
 } as const
 

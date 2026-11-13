@@ -32,11 +32,13 @@ import type {
 } from '../db/types'
 import {
   SETTINGS_ROW_ID,
+  type AttachmentExport,
   type ChronicleData,
   type ChronicleDbLike,
   type ChronicleExport,
   type TableName,
 } from './export'
+import { attachmentFromExport, isValidBase64 } from './attachments'
 import { remapChronicleAsNew } from './remap'
 
 export class ImportError extends Error {
@@ -237,6 +239,24 @@ const quickNoteSchema = baseSchema.extend({
   convertedTo: z.string().nullable().optional(),
 }).passthrough()
 
+/**
+ * One attachment as it appears in a backup. Validated per-row in
+ * parseImportFile (see below) — a single corrupt file must not kill the
+ * whole import — so this schema is NOT part of chronicleExportSchema.
+ */
+const attachmentExportSchema = z.object({
+  id: idSchema,
+  chronicleId: idSchema,
+  recordType: z.enum(['memory', 'journalEntry', 'person', 'place']),
+  recordId: idSchema,
+  fileName: z.string().min(1).max(255),
+  mimeType: z.string().min(1).max(200),
+  sizeBytes: z.number().int().min(0),
+  dataBase64: z.string().refine((v) => isValidBase64(v), 'file data is not valid base64'),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+}).passthrough()
+
 const endingSchema = baseSchema.extend({
   finalEra: z.string(),
   finalAge: z.number().optional(),
@@ -269,6 +289,9 @@ export const chronicleExportSchema = z.object({
   diceRolls: z.array(diceRollSchema).default([]),
   promptNotes: z.array(promptNoteSchema).default([]),
   quickNotes: z.array(quickNoteSchema).default([]),
+  // Accepted as-is here and validated per-row in parseImportFile: one corrupt
+  // attachment must not fail the whole backup (see attachmentExportSchema).
+  attachments: z.array(z.unknown()).default([]),
   ending: endingSchema.nullable().default(null),
   settings: z
     .object({
@@ -318,7 +341,40 @@ export function parseImportFile(text: string): ChronicleExport {
       details,
     )
   }
-  return result.data as ChronicleExport
+  const data = result.data as ChronicleExport
+  // Attachments are validated one row at a time: a corrupt file (bad base64,
+  // missing name, wrong shape) is dropped and reported, and the rest of the
+  // chronicle still imports. The dropped rows are listed on the parsed data
+  // so previewImport can warn about them.
+  const rawAttachments = Array.isArray(obj.attachments) ? obj.attachments : []
+  const validAttachments: AttachmentExport[] = []
+  const skippedAttachments: { fileName: string; reason: string }[] = []
+  for (const row of rawAttachments) {
+    const parsed = attachmentExportSchema.safeParse(row)
+    if (parsed.success) {
+      validAttachments.push(parsed.data)
+    } else {
+      const fileName =
+        row !== null &&
+        typeof row === 'object' &&
+        typeof (row as Record<string, unknown>).fileName === 'string'
+          ? ((row as Record<string, unknown>).fileName as string)
+          : '(unnamed file)'
+      skippedAttachments.push({
+        fileName,
+        reason: parsed.error.issues
+          .slice(0, 2)
+          .map((issue) => {
+            const path = issue.path.length ? issue.path.join('.') : '(attachment)'
+            return `${path}: ${issue.message}`
+          })
+          .join('; '),
+      })
+    }
+  }
+  data.attachments = validAttachments
+  if (skippedAttachments.length > 0) data.skippedAttachments = skippedAttachments
+  return data
 }
 
 // --- Preview ----------------------------------------------------------------
@@ -352,6 +408,7 @@ const COUNT_TABLES: { key: keyof ChronicleData; table: TableName; label: string 
   { key: 'diceRolls', table: 'diceRolls', label: 'Dice rolls' },
   { key: 'promptNotes', table: 'promptNotes', label: 'Prompt notes' },
   { key: 'quickNotes', table: 'quickNotes', label: 'Quick notes' },
+  { key: 'attachments', table: 'attachments', label: 'Attachments' },
 ]
 
 function countRecords(data: ChronicleExport): Record<string, number> {
@@ -373,6 +430,11 @@ export async function previewImport(
   const totalRecords = Object.values(counts).reduce((a, b) => a + b, 0)
   const duplicateIds: { table: TableName; id: ID }[] = []
   const warnings: string[] = []
+  if (data.skippedAttachments?.length) {
+    warnings.push(
+      `${data.skippedAttachments.length} attachment(s) in this backup had corrupt file data and will be skipped (${data.skippedAttachments.map((s) => s.fileName).join(', ')}). The rest of the chronicle still imports.`,
+    )
+  }
   if (db) {
     for (const { key, table } of COUNT_TABLES) {
       const rows = (data[key] as { id: ID }[]) ?? []
@@ -424,7 +486,7 @@ async function deleteChronicleRecords(db: ChronicleDbLike, chronicleId: ID): Pro
   for (const table of [
     'skills', 'resources', 'stateChanges', 'memories', 'memoryVersions',
     'journalEntries', 'drafts', 'timelineEvents', 'people', 'relationships',
-    'places', 'threads', 'recaps', 'diceRolls', 'promptNotes', 'quickNotes', 'endings',
+    'places', 'threads', 'recaps', 'diceRolls', 'promptNotes', 'quickNotes', 'attachments', 'endings',
   ] as TableName[]) {
     const rows = await db.table<{ id: ID; chronicleId: ID }>(table).toArray()
     const doomed = rows.filter((r) => r.chronicleId === chronicleId).map((r) => r.id)
@@ -482,11 +544,21 @@ export async function applyImport(
     await putAll(db, 'diceRolls', clone.diceRolls)
     await putAll(db, 'promptNotes', clone.promptNotes)
     await putAll(db, 'quickNotes', clone.quickNotes)
+    // Backup rows carry bytes as base64; decode them back to Blobs.
+    if (clone.attachments.length > 0) {
+      await putAll(db, 'attachments', await Promise.all(clone.attachments.map(attachmentFromExport)))
+    }
     if (clone.ending) await putAll(db, 'endings', [clone.ending])
     return { chronicleId: clone.chronicle.id, chronicleTitle: clone.chronicle.title, mode, counts }
   }
 
   const { chronicle, rows } = remapChronicleAsNew(data)
+  // Backup rows carry bytes as base64; decode them back to Blobs before writing.
+  if (rows.attachments && rows.attachments.length > 0) {
+    rows.attachments = await Promise.all(
+      rows.attachments.map((row) => attachmentFromExport(row as AttachmentExport)),
+    )
+  }
   // Same-title collision: keep both chronicles distinguishable.
   const sameTitle = (await db.table<Chronicle>('chronicles').toArray()).some((c) => c.title === chronicle.title)
   if (sameTitle) chronicle.title = `${chronicle.title} (imported)`

@@ -12,6 +12,7 @@ import {
   MEMORY_STATUS_META,
 } from '../lib/memories'
 import MemoryLossDialog, { type MemoryChangeInput } from '../components/MemoryLossDialog'
+import AttachmentList from '../components/AttachmentList'
 
 export default function MemoryDetail() {
   const { id } = useParams<{ id: string }>()
@@ -226,6 +227,8 @@ export default function MemoryDetail() {
           </ol>
         )}
       </section>
+
+      <AttachmentList chronicleId={memory.chronicleId} recordType="memory" recordId={memory.id} />
 
       {dialogMode && (
         <MemoryLossDialog

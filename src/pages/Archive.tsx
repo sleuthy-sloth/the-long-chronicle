@@ -15,7 +15,7 @@
 //   locks the data: everything stays reviewable and editable afterwards.
 // - Each completed chronicle in the list shows its ending record(s).
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { archiveChronicle, deleteChronicle, duplicateChronicle, restoreChronicle } from '../db/database'
 import { useAppStore } from '../state/store'
 import { downloadJsonBackup, getDb } from '../lib/export'
@@ -33,6 +33,7 @@ import {
 } from '../lib/archive'
 import type { RecapSections } from '../lib/archive'
 import type { Chronicle, Ending, Recap } from '../db/types'
+import WritingStatsPanel from '../components/WritingStatsPanel'
 
 export default function Archive() {
   const chronicles = useAppStore((s) => s.chronicles)
@@ -53,6 +54,20 @@ export default function Archive() {
   const [recapTitle, setRecapTitle] = useState('')
   const [recapEra, setRecapEra] = useState('')
   const [recapSections, setRecapSections] = useState<RecapSections>({})
+
+  // Time-jump recap offer: the dialog navigates here with router state
+  // { openRecap, recapEra, recapTitle } — open the recap form prefilled,
+  // never forced; the player can still close it without writing anything.
+  const location = useLocation()
+  useEffect(() => {
+    const state = location.state as { openRecap?: boolean; recapEra?: string; recapTitle?: string } | null
+    if (state?.openRecap) {
+      if (state.recapEra) setRecapEra(state.recapEra)
+      if (state.recapTitle) setRecapTitle(state.recapTitle)
+      setRecapFormOpen(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const [endingEra, setEndingEra] = useState('')
   const [endingAge, setEndingAge] = useState('')
@@ -137,6 +152,11 @@ export default function Archive() {
         are records, and completing a chronicle never locks it — a finished story can still be re-read, corrected,
         and continued.
       </p>
+      <p className="mb-5 text-sm">
+        <Link to="/snapshots" className="text-oxblood underline dark:text-gold-light">
+          Character snapshots by era →
+        </Link>
+      </p>
       {notice && (
         <p role="status" className="mb-4 rounded-md bg-gold/15 px-3 py-2 text-sm dark:bg-gold/20">
           {notice}
@@ -206,6 +226,13 @@ export default function Archive() {
         <EmptyState title="No active chronicle">
           <p>Start or open a chronicle to write recaps and endings for it.</p>
         </EmptyState>
+      )}
+
+      {/* ---- Quiet writing stats (Stream D) ---- */}
+      {activeChronicle && (
+        <div className="mb-8">
+          <WritingStatsPanel chronicleId={activeChronicle.id} variant="full" />
+        </div>
       )}
 
       {/* ---- Completed chronicles (Stream A) ---- */}

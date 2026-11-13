@@ -12,6 +12,9 @@ import { useAppStore } from '../state/store'
 import { Badge, Button, EmptyState } from '../components/ui'
 import { CreateChronicleDialog } from './Chronicles'
 import { formatRelativeTime, pluralize } from '../lib/utils'
+import { createCharacterSnapshot } from '../lib/snapshots'
+import TimeJumpDialog from '../components/TimeJumpDialog'
+import WritingStatsPanel from '../components/WritingStatsPanel'
 
 interface DashboardData {
   activeMemories: number
@@ -37,6 +40,7 @@ export default function Dashboard() {
   const ready = useAppStore((s) => s.ready)
   const [data, setData] = useState<DashboardData | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [showTimeJump, setShowTimeJump] = useState(false)
 
   useEffect(() => {
     if (!activeChronicle) {
@@ -135,6 +139,13 @@ export default function Dashboard() {
         </div>
       </dl>
 
+      {/* Quiet writing stats (Stream D) — just the record, no targets. */}
+      {c && (
+        <div className="mt-6">
+          <WritingStatsPanel chronicleId={c.id} variant="compact" />
+        </div>
+      )}
+
       {/* Quick actions */}
       <h2 className="mb-3 mt-8 font-serif text-xl font-semibold">Continue the story</h2>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -151,6 +162,15 @@ export default function Dashboard() {
             <span className="block text-xs text-ink-soft dark:text-parchment/70">{a.hint}</span>
           </Link>
         ))}
+        <button
+          type="button"
+          onClick={() => setShowTimeJump(true)}
+          className="rounded-lg border border-ink/15 bg-parchment-card p-4 text-left transition-colors hover:border-gold dark:border-parchment/15 dark:bg-charcoal-card dark:hover:border-gold-light"
+        >
+          <span aria-hidden="true" className="text-lg text-oxblood dark:text-gold-light">↝</span>
+          <span className="mt-1 block font-medium">Time jump</span>
+          <span className="block text-xs text-ink-soft dark:text-parchment/70">Centuries pass</span>
+        </button>
         <Link
           to="/chronicles"
           className="rounded-lg border border-dashed border-ink/25 p-4 transition-colors hover:border-gold dark:border-parchment/25 dark:hover:border-gold-light"
@@ -251,6 +271,14 @@ export default function Dashboard() {
           </section>
         </div>
       </div>
+      {showTimeJump && (
+        <TimeJumpDialog
+          open={showTimeJump}
+          onClose={() => setShowTimeJump(false)}
+          chronicle={c}
+          createSnapshot={(chronicleId, opts) => createCharacterSnapshot(chronicleId, opts)}
+        />
+      )}
     </div>
   )
 }

@@ -19,6 +19,7 @@ import {
 } from '../lib/people'
 import type { JournalEntry, Memory, Relationship } from '../db/types'
 import { formatRelativeTime } from '../lib/utils'
+import AttachmentList from '../components/AttachmentList'
 
 export default function PersonDetail() {
   const { personId } = useParams<{ personId: string }>()
@@ -291,6 +292,8 @@ export default function PersonDetail() {
           </div>
         </form>
       </Modal>
+
+      <AttachmentList chronicleId={person.chronicleId} recordType="person" recordId={person.id} />
 
       <ConfirmDialog
         open={confirmDelete}

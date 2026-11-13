@@ -4,7 +4,7 @@ export const APP = {
   shortName: 'Chronicle',
   tagline: 'An immortal’s archive — a companion for Thousand Year Old Vampire.',
   version: '0.1.0',
-  schemaVersion: 1,
+  schemaVersion: 2,
 } as const
 export const THEME_TOKENS = {
   light: { bg: '#f4eedd', card: '#faf6ee', ink: '#2b241f', accent: '#6e1f1f', gold: '#a8842c' },

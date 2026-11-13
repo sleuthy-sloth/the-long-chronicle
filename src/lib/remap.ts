@@ -61,6 +61,10 @@ export function remapChronicleAsNew(data: ChronicleData): RemappedChronicle {
     { table: 'diceRolls', rows: clone.diceRolls },
     { table: 'promptNotes', rows: clone.promptNotes },
     { table: 'quickNotes', rows: clone.quickNotes },
+    // Attachments ride along as backup-shaped rows (bytes as base64); their
+    // recordId is remapped by the shared rewrite below, so the copy's files
+    // point at the copy's records, never the originals.
+    { table: 'attachments', rows: clone.attachments },
   ]
   if (clone.ending) allRows.push({ table: 'endings', rows: [clone.ending] })
   for (const { rows } of allRows) for (const row of rows) fresh(row.id)

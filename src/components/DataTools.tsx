@@ -31,6 +31,8 @@ import {
   type ImportPreview,
 } from '../lib/import'
 import { buildCombinedMarkdown, buildMarkdownFiles } from '../lib/markdownExport'
+import { downloadBookHtml } from '../lib/bookExport'
+import { attachmentsCount, attachmentsTotalBytes, formatAttachmentSize } from '../lib/attachments'
 import { createZip } from '../lib/zip'
 import { formatDateTime } from '../lib/utils'
 import { Badge } from './ui'
@@ -66,6 +68,7 @@ export default function DataTools({ chronicleId: chronicleIdProp, onImported, db
   const [importMode, setImportMode] = useState<'new' | 'overwrite'>('new')
   const [confirmReplace, setConfirmReplace] = useState(false)
   const [storage, setStorage] = useState<{ usedMB: string; quotaMB: string } | null>(null)
+  const [attachmentStorage, setAttachmentStorage] = useState<{ count: number; bytes: number } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const lastExportAt = activeChronicle?.lastExportAt ?? settingsLastExport ?? null
@@ -101,6 +104,22 @@ export default function DataTools({ chronicleId: chronicleIdProp, onImported, db
       cancelled = true
     }
   }, [chronicleId, db])
+
+  // Attachments storage is a snapshot read at mount / chronicle change; it
+  // does not live-update when a file is added on a detail page.
+  useEffect(() => {
+    if (!chronicleId) {
+      setAttachmentStorage(null)
+      return
+    }
+    let cancelled = false
+    void Promise.all([attachmentsCount(chronicleId), attachmentsTotalBytes(chronicleId)]).then(([count, bytes]) => {
+      if (!cancelled) setAttachmentStorage({ count, bytes })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [chronicleId])
 
   const run = useCallback(
     async (label: string, fn: () => Promise<string>) => {
@@ -144,6 +163,13 @@ export default function DataTools({ chronicleId: chronicleIdProp, onImported, db
       const text = buildCombinedMarkdown(data)
       downloadFile(exportFileName(data.chronicle, 'chronicle', 'md'), text, 'text/markdown')
       return 'Combined Markdown file downloaded.'
+    })
+
+  const handleBookHtml = () =>
+    run('Book export', async () => {
+      if (!chronicleId) throw new Error('No chronicle is open to export.')
+      await downloadBookHtml(db, chronicleId)
+      return 'Book (.html) downloaded — one self-contained file, readable offline.'
     })
 
   const handleSingleExport = (kind: 'memories' | 'characterSheet' | 'timeline') =>
@@ -249,6 +275,14 @@ export default function DataTools({ chronicleId: chronicleIdProp, onImported, db
             </dd>
           </div>
         )}
+        {attachmentStorage && (
+          <div className="flex gap-2">
+            <dt className="font-medium">Attachments in this chronicle:</dt>
+            <dd>
+              {attachmentStorage.count} file{attachmentStorage.count === 1 ? '' : 's'}, {formatAttachmentSize(attachmentStorage.bytes)} of local storage
+            </dd>
+          </div>
+        )}
         <div className="flex gap-2">
           <dt className="font-medium">App version:</dt>
           <dd>{APP.version}</dd>
@@ -269,7 +303,8 @@ export default function DataTools({ chronicleId: chronicleIdProp, onImported, db
       <h3 className="mt-5 font-serif text-xl">Export</h3>
       <p className="mt-1 text-sm text-ink-soft dark:text-parchment/80">
         Exports are files on your device — nothing is uploaded anywhere. JSON backups restore
-        fully; Markdown is for reading and printing.
+        fully (backups include attached files); Markdown is for reading and printing. The book
+        export is the whole chronicle as one printable .html file.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" onClick={() => void handleJsonBackup()} disabled={busy || !chronicleId} className="rounded bg-oxblood px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
@@ -280,6 +315,9 @@ export default function DataTools({ chronicleId: chronicleIdProp, onImported, db
         </button>
         <button type="button" onClick={() => void handleCombinedMarkdown()} disabled={busy || !chronicleId} className="rounded border border-oxblood px-4 py-2 text-sm font-semibold text-oxblood dark:text-red-300 disabled:opacity-50">
           Download Markdown (single file)
+        </button>
+        <button type="button" onClick={() => void handleBookHtml()} disabled={busy || !chronicleId} className="rounded border border-oxblood px-4 py-2 text-sm font-semibold text-oxblood dark:text-red-300 disabled:opacity-50">
+          Download book (.html)
         </button>
       </div>
 

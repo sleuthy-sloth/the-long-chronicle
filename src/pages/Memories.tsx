@@ -139,14 +139,19 @@ export default function Memories() {
             {memories.length > 0 && ` Next code: ${nextMemoryCode(memories)}.`}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowCreate((v) => !v)}
-          aria-expanded={showCreate}
-          className="rounded bg-oxblood px-4 py-2 text-sm font-semibold text-white"
-        >
-          {showCreate ? 'Close form' : 'Record a memory'}
-        </button>
+        <div className="flex gap-2">
+          <Link to="/review" className="rounded border border-ink/30 px-4 py-2 text-sm font-semibold">
+            Review memories
+          </Link>
+          <button
+            type="button"
+            onClick={() => setShowCreate((v) => !v)}
+            aria-expanded={showCreate}
+            className="rounded bg-oxblood px-4 py-2 text-sm font-semibold text-white"
+          >
+            {showCreate ? 'Close form' : 'Record a memory'}
+          </button>
+        </div>
       </div>
 
       {showCreate && (

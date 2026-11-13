@@ -10,7 +10,7 @@
 // (kind 'other', field 'selfDescription') rather than a new history row on
 // every keystroke.
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   addResource,
   addSkill,
@@ -30,6 +30,8 @@ import type { CharacterStateChange, JournalEntry, Resource, Skill } from '../db/
 import { useAppStore, useAutosave } from '../state/store'
 import { Badge, Button, ConfirmDialog, EmptyState, Field, Input, Modal, Select, Textarea } from '../components/ui'
 import { formatRelativeTime } from '../lib/utils'
+import { createCharacterSnapshot } from '../lib/snapshots'
+import TimeJumpDialog from '../components/TimeJumpDialog'
 
 const KIND_LABEL: Record<CharacterStateChange['kind'], string> = {
   skill: 'Skill',
@@ -160,6 +162,8 @@ export default function Character() {
   const [showResourceForm, setShowResourceForm] = useState(false)
   const [editingResource, setEditingResource] = useState<Resource | null>(null)
   const [deleting, setDeleting] = useState<{ kind: 'skill' | 'resource' | 'state'; id: string; label: string } | null>(null)
+  const [showTimeJump, setShowTimeJump] = useState(false)
+  const navigate = useNavigate()
 
   // State-entry form (conditions / traits / compulsions).
   const [entryKind, setEntryKind] = useState<'condition' | 'trait' | 'other'>('condition')
@@ -267,7 +271,9 @@ export default function Character() {
     await reload()
   }
 
-  const stateEntries = history.filter((h) => h.kind === 'condition' || h.kind === 'trait' || (h.kind === 'other' && h.field !== 'selfDescription'))
+  // Time-jump records are history, not conditions — keep them out of the
+  // conditions/traits list (they still show in the full change history).
+  const stateEntries = history.filter((h) => h.kind === 'condition' || h.kind === 'trait' || (h.kind === 'other' && h.field !== 'selfDescription' && h.field !== 'timeJump'))
 
   if (!activeChronicle) {
     return (
@@ -291,6 +297,26 @@ export default function Character() {
           {activeChronicle.title} — changes save automatically as you type, and every skill or resource edit is
           written to the history below.
         </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowTimeJump(true)}>
+            Time jump — centuries pass…
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (!chronicleId) return
+              void createCharacterSnapshot(chronicleId, { era: activeChronicle.currentEra, sourceKind: 'manual' }).then(() => {
+                navigate('/snapshots')
+              })
+            }}
+          >
+            Snapshot now
+          </Button>
+          <Link to="/snapshots" className="text-sm text-oxblood underline dark:text-gold-light">
+            View snapshots →
+          </Link>
+        </div>
       </div>
 
       {loading ? (
@@ -585,6 +611,14 @@ export default function Character() {
           keeps its memory of what was there.
         </p>
       </ConfirmDialog>
+      {showTimeJump && (
+        <TimeJumpDialog
+          open={showTimeJump}
+          onClose={() => setShowTimeJump(false)}
+          chronicle={activeChronicle}
+          createSnapshot={(chronicleId, opts) => createCharacterSnapshot(chronicleId, opts)}
+        />
+      )}
     </div>
   )
 }

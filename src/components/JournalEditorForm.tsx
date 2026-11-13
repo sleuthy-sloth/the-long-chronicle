@@ -14,6 +14,7 @@ import { renderMarkdown } from '../lib/markdown'
 import { editorFontSizeStyle } from '../lib/editorFont'
 import { useAppStore } from '../state/store'
 import { parseTags, type NewStateChangeInput, type SaveEntryInput } from '../lib/journal'
+import AttachmentList from './AttachmentList'
 
 export interface JournalEditorFormProps {
   chronicle: Chronicle
@@ -709,6 +710,10 @@ export default function JournalEditorForm({
           </button>
         </div>
       </section>
+
+      {entry && (
+        <AttachmentList chronicleId={chronicle.id} recordType="journalEntry" recordId={entry.id} />
+      )}
     </form>
   )
 }

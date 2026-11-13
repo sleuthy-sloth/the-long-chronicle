@@ -1,6 +1,7 @@
 // @vitest-environment node
 // Stream D tests: JSON export / import round-trip, validation, overwrite rules.
 import { beforeEach, describe, expect, it } from 'vitest'
+import { APP } from '../src/config/app'
 import { resetDb } from '../src/db/database'
 import { db } from '../src/lib/localDb'
 import {
@@ -55,7 +56,7 @@ describe('JSON export', () => {
     const seed = await seedTestChronicle()
     const backup = await buildExport(getDb(), seed.chronicle.id)
     expect(backup.app).toBe('The Long Chronicle')
-    expect(backup.schemaVersion).toBe(1)
+    expect(backup.schemaVersion).toBe(APP.schemaVersion)
     expect(backup.exportedAt).toBeTruthy()
     expect(backup.chronicle.title).toBe('The Ashen Archive')
   })

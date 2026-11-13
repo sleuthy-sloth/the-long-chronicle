@@ -10,8 +10,10 @@
 import { APP } from '../config/app'
 import { newId, nowIso } from '../db/types'
 import { db as canonicalDb, DEFAULT_SETTINGS } from '../db/database'
+import { attachmentToExport } from './attachments'
 import type {
   AppSettings,
+  Attachment,
   CharacterStateChange,
   Chronicle,
   DiceRoll,
@@ -69,11 +71,26 @@ export const TABLE_NAMES = [
   'diceRolls',
   'promptNotes',
   'quickNotes',
+  'attachments',
   'endings',
   'settings',
 ] as const
 
 export type TableName = (typeof TABLE_NAMES)[number]
+
+/** One attachment as it appears in a JSON backup: file bytes as base64. */
+export interface AttachmentExport {
+  id: ID
+  chronicleId: ID
+  recordType: Attachment['recordType']
+  recordId: ID
+  fileName: string
+  mimeType: string
+  sizeBytes: number
+  dataBase64: string
+  createdAt: string
+  updatedAt: string
+}
 
 /** The full, chronicle-scoped data set. Also the body of a JSON backup. */
 export interface ChronicleData {
@@ -94,6 +111,7 @@ export interface ChronicleData {
   diceRolls: DiceRoll[]
   promptNotes: PromptNote[]
   quickNotes: QuickNote[]
+  attachments: AttachmentExport[]
   ending: Ending | null
 }
 
@@ -103,6 +121,9 @@ export interface ChronicleExport extends ChronicleData {
   exportedAt: string
   /** Settings that belong to the chronicle, not the device (theme stays local). */
   settings: { activeChronicleId?: string | null; lastExportAt?: string | null }
+  /** Import-side only: attachments dropped while parsing because their file
+   *  data was corrupt. Never written by buildExport. */
+  skippedAttachments?: { fileName: string; reason: string }[]
 }
 
 export const SETTINGS_ROW_ID = 'settings'
@@ -162,6 +183,7 @@ export async function collectChronicleData(
     promptNotes,
     quickNotes,
     endings,
+    rawAttachments,
   ] = await Promise.all([
     table<Skill>(db, 'skills'),
     table<Resource>(db, 'resources'),
@@ -180,6 +202,7 @@ export async function collectChronicleData(
     table<PromptNote>(db, 'promptNotes'),
     table<QuickNote>(db, 'quickNotes'),
     table<Ending>(db, 'endings'),
+    table<Attachment>(db, 'attachments'),
   ])
   return {
     chronicle,
@@ -199,6 +222,10 @@ export async function collectChronicleData(
     diceRolls: forChronicle(diceRolls, chronicleId),
     promptNotes: forChronicle(promptNotes, chronicleId),
     quickNotes: forChronicle(quickNotes, chronicleId),
+    // Backup shape: file bytes as base64, so the JSON stays self-contained.
+    attachments: await Promise.all(
+      forChronicle(rawAttachments, chronicleId).map(attachmentToExport),
+    ),
     ending: forChronicle(endings, chronicleId)[0] ?? null,
   }
 }

@@ -66,6 +66,39 @@ Keyboard shortcuts: `⌘/Ctrl K` search, `⌘/Ctrl N` new journal entry,
 `⌘/Ctrl S` save everything now, `⌘/Ctrl ⇧ M` new memory, `?` shortcut help,
 `Esc` close dialog or search.
 
+## New in this round
+
+Seven small additions, all local-only like the rest of the app:
+
+- **Used-prompt log** — a prompt note can be marked as used in play
+  (`promptNotes.used`), so a prompt already spent is easy to tell apart
+  from one still waiting.
+- **Time-jump helper** — jumps the chronicle forward across uneventful
+  years and records the jump on the timeline as a time-jump event.
+- **Memory review mode** — a pass for re-reading memories one by one; each
+  review is stamped with the date (`memories.lastReviewedAt`).
+- **Character snapshots** — frozen copies of the character sheet at a
+  chosen era: skills, resources, and conditions as they stood then.
+  Snapshots are never edited.
+- **Book export** — the whole chronicle as one self-contained `.html` file
+  (see [Backup & restore](#backup--restore)).
+- **Attachments** — files attached to a memory, journal entry, person, or
+  place. The bytes live in IndexedDB as a Blob; the cap is 5 MB per file.
+- **Quiet writing stats** — counts only: words written, journal entries,
+  entries per era, memories kept / lost / altered, people, places, threads,
+  and the span of eras covered. No streaks, no goals, no comparisons. Shown
+  on the Dashboard and in the Archive (`<WritingStatsPanel />`).
+
+### Schema v2
+
+The database is now at schema version 2 (`APP.schemaVersion`). Opening a
+v1 database upgrades it in place: two new tables (`characterSnapshots`,
+`attachments`), and the new fields on old records are backfilled —
+`memories.lastReviewedAt` to `null`, `promptNotes.used` to `false`. Every
+v1 record is preserved; nothing is dropped or rewritten. Covered by
+`tests/migration-v2.test.ts`, which builds a v1-shaped database and opens
+it under v2.
+
 ## Backup & restore
 
 There is no server copy. **Export is the only backup.** The Settings page
@@ -90,6 +123,13 @@ reminds you when the last backup is getting old.
   (`Journal/NNN-title.md`), Timeline, People, Places, Story Threads,
   Recaps. Every file carries the record's stable id so a printed page can be
   traced back to its database row.
+- **Book export** (single `.html`, also via `<DataTools />`) — the whole
+  chronicle as one self-contained file: Overview, Character Sheet, Memories
+  (grouped by status: Active, Lost, Altered, Archived), Journal (one
+  section per entry, in order), Timeline, People, Places, Story Threads,
+  Recaps. Inline CSS only — no scripts, no external fonts, no external
+  references of any kind — so it opens straight from disk and prints
+  cleanly. Every record carries its stable id, as in the Markdown export.
 - **Single-record exports** (JSON, also via `<DataTools />`) — one journal
   entry (with its linked memories / people / places embedded), all memories,
   the character sheet, or the timeline.
@@ -179,10 +219,12 @@ favicon and the PNG icons.
 
 - **Unit** (`npm run test`, Vitest + fake-indexeddb): JSON export/import
   round-trip and id remapping, validation errors, overwrite rules, the
-  hand-rolled ZIP writer round-trip, Markdown export files, and global
+  hand-rolled ZIP writer round-trip, Markdown export files, the book HTML
+  export, quiet writing stats, the schema v1 → v2 migration, and global
   search. Test files: `tests/export-import.test.ts`, `tests/zip.test.ts`,
-  `tests/markdown-export.test.ts`, `tests/search.test.ts` (plus other
-  streams' suites). All test content is invented placeholder text written
+  `tests/markdown-export.test.ts`, `tests/search.test.ts`,
+  `tests/book-export.test.ts`, `tests/writing-stats.test.ts`,
+  `tests/migration-v2.test.ts` (plus other streams' suites). All test content is invented placeholder text written
   for the tests.
 - **End-to-end** (`tests/e2e/`, Playwright, against `vite preview`):
   chronicle creation + persistence, 10 memories, lose/alter flows, journal

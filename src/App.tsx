@@ -26,6 +26,9 @@ const PersonDetail = lazy(() => import('./pages/PersonDetail'))
 const PlaceDetail = lazy(() => import('./pages/PlaceDetail'))
 const Threads = lazy(() => import('./pages/Threads'))
 const Utilities = lazy(() => import('./pages/Utilities'))
+const PromptLog = lazy(() => import('./pages/PromptLog'))
+const Review = lazy(() => import('./pages/Review'))
+const Snapshots = lazy(() => import('./pages/Snapshots'))
 
 /** Placeholder for routes whose stream has not landed a page yet. */
 export function ComingSoon({ title, description }: { title: string; description: string }) {
@@ -146,6 +149,7 @@ export default function App() {
           <Route path="character" element={<Character />} />
           <Route path="memories" element={<Memories />} />
           <Route path="memories/:id" element={<MemoryDetail />} />
+          <Route path="review" element={<Review />} />
           <Route path="journal" element={<Journal />} />
           <Route path="journal/new" element={<JournalEditor />} />
           <Route path="journal/:id" element={<JournalEditor />} />
@@ -157,7 +161,9 @@ export default function App() {
           <Route path="places/:placeId" element={<PlaceDetail />} />
           <Route path="threads" element={<Threads />} />
           <Route path="utilities" element={<Utilities />} />
+          <Route path="prompts" element={<PromptLog />} />
           <Route path="archive" element={<Archive />} />
+          <Route path="snapshots" element={<Snapshots />} />
           <Route path="settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Route>

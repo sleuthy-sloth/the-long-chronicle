@@ -1,0 +1,17 @@
+@import '@fontsource/eb-garamond/400.css';
+@import '@fontsource/eb-garamond/600.css';
+@import '@fontsource/eb-garamond/700.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+:root { color-scheme: light; }
+.dark { color-scheme: dark; }
+body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+h1,h2,h3,.font-serif { font-family: 'EB Garamond', Georgia, serif; }
+:focus-visible { outline: 2px solid #a8842c; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+textarea, input, select { font: inherit; }
+.markdown-body h1,.markdown-body h2,.markdown-body h3 { font-family: 'EB Garamond', Georgia, serif; font-weight: 600; margin: .6em 0 .3em; }
+.markdown-body p { margin: .4em 0; } .markdown-body ul,.markdown-body ol { margin: .4em 0 .4em 1.4em; list-style: revert; }
+.markdown-body blockquote { border-left: 3px solid #a8842c; padding-left: .8em; color: inherit; opacity: .85; margin: .5em 0; }
+.markdown-body em { font-style: italic; } .markdown-body strong { font-weight: 700; }

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="The Long Chronicle — an hourglass inside an arch">
+  <!-- Original mark: parchment field, gold frame, oxblood arch, gold hourglass.
+       Same geometry as scripts/make-icons.mjs renders into the PNG icons. -->
+  <rect width="512" height="512" fill="#f4eedd"/>
+  <rect x="10" y="10" width="492" height="492" fill="none" stroke="#a8842c" stroke-width="6"/>
+  <path d="M 128 432 L 128 256 A 128 128 0 0 1 384 256 L 384 432 Z" fill="#6e1f1f"/>
+  <g fill="#c9a44a">
+    <rect x="176" y="202" width="160" height="12"/>
+    <rect x="176" y="356" width="160" height="12"/>
+    <path d="M 196 214 L 316 214 L 256 285 Z"/>
+    <path d="M 196 356 L 316 356 L 256 285 Z"/>
+  </g>
+</svg>

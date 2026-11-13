@@ -1,0 +1,45 @@
+# Deploy the PWA to GitHub Pages (project page) on every push to main.
+# One-time setup (repo owner, in Settings → Pages): Build and deployment →
+# Source: GitHub Actions. After that, pushes deploy automatically.
+# The SPA fallback: GitHub Pages serves dist/404.html for unknown paths, so a
+# copy of the built index.html keeps deep links (e.g. /memories) working.
+# Note: no package-lock.json exists yet, so this uses `npm install`
+# (not `npm ci`) with no npm cache. Once a lockfile is committed, switch to
+# `npm ci` and `cache: npm`.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install
+      - run: npm run test
+      - run: VITE_BASE=/the-long-chronicle/ npm run build
+      - run: cp dist/index.html dist/404.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

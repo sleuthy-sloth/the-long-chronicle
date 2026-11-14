@@ -1,5 +1,9 @@
 # The Long Chronicle
 
+[![Deploy to GitHub Pages](https://github.com/sleuthy-sloth/the-long-chronicle/actions/workflows/deploy.yml/badge.svg)](https://github.com/sleuthy-sloth/the-long-chronicle/actions/workflows/deploy.yml)
+[![Live site](https://img.shields.io/badge/live-sleuthy--sloth.github.io-the--long--chronicle-6e1f1f)](https://sleuthy-sloth.github.io/the-long-chronicle/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 An offline-first companion for playing **Thousand Year Old Vampire**: a
 personal archive for one vampire's thousand years — memories (kept, lost,
 altered), a journal, a character sheet with a full change history, people,
